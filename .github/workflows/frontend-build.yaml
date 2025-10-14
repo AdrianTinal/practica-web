@@ -7,7 +7,7 @@ on:
       - "v*.*.*"
     # REQUISITO 2: El workflow solo se ejecuta si hay cambios en la carpeta 'frontend'
     paths:
-      - 'frontend/**' 
+      - 'frontend-app/**' 
 
 jobs:
   build:
