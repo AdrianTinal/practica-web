@@ -5,7 +5,6 @@ on:
     branches: ["main"]
     tags:
       - "v*.*.*"
-    # REQUISITO 2: El workflow solo se ejecuta si hay cambios en la carpeta 'frontend'
     paths:
       - 'frontend-app/**' 
 
@@ -15,7 +14,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write # Necesario para subir a GHCR
+      packages: write
 
     steps:
       - name: Checkout code
@@ -42,9 +41,9 @@ jobs:
           fi
           
       - name: Build Docker image for Frontend
-        # El contexto es ./frontend-app, y le añadimos un sufijo al tag 
+
         run: |
-          docker build -f Dockerfile -t ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG }}-frontend ./frontend-app
+          docker build -f ./frontend-app/Dockerfile -t ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG }}-frontend ./frontend-app
 
       - name: Push Docker image
         run: |
