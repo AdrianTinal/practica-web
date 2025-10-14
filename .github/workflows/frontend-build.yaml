@@ -1,12 +1,13 @@
-name: Build and Push Docker Image
+name: Build and Push Frontend Docker Image
 
 on:
   push:
     branches: ["main"]
     tags:
       - "v*.*.*"
+    # REQUISITO 2: El workflow solo se ejecuta si hay cambios en la carpeta 'frontend'
     paths:
-      - 'Backend/**' 
+      - 'frontend/**' 
 
 jobs:
   build:
@@ -27,7 +28,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine image tags
+      - name: Determine image tags (Latest / Version)
         id: vars
         run: |
           # Convertir el nombre del repositorio a minúsculas
@@ -39,12 +40,12 @@ jobs:
           else
             echo "TAG=latest" >> $GITHUB_ENV
           fi
-
-      - name: Build Docker image for Backend
-        # El contexto es ./Backend, y le añadimos un sufijo al tag
+          
+      - name: Build Docker image for Frontend
+        # El contexto es ./frontend-app, y le añadimos un sufijo al tag 
         run: |
-          docker build -t ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG }}-backend ./Backend
+          docker build -t ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG }}-frontend ./frontend-app
 
       - name: Push Docker image
         run: |
-          docker push ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG }}-backend
+          docker push ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG }}-frontend
