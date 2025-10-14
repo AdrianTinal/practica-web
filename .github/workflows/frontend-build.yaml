@@ -44,7 +44,7 @@ jobs:
       - name: Build Docker image for Frontend
         # El contexto es ./frontend-app, y le añadimos un sufijo al tag 
         run: |
-          docker build -t ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG }}-frontend ./frontend-app
+          docker build -f Dockerfile -t ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG }}-frontend ./frontend-app
 
       - name: Push Docker image
         run: |
