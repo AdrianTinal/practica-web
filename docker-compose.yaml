@@ -1,3 +1,4 @@
+version: '3.8'
 services:
   mongo:
     image: mirror.gcr.io/library/mongo:8
@@ -12,29 +13,30 @@ services:
       - mongo-network
 
   calculadora:
-    build: ./backend  # Asegúrate de que esta línea esté correcta
-    # Corrección aquí:
+    # USAR: ghcr.io/[usuario_minúsculas]/[repo_minúsculas]:latest-backend
+    image: ghcr.io/adriantinal/practica-web:latest-backend 
+    # AÑADIDO: Forzar la arquitectura a Linux/AMD64 para asegurar compatibilidad con el runner de GitHub
+    platform: linux/amd64 
     ports:
       - "8000:8000"
     networks:
       - mongo-network
     depends_on:
-      - mongo  # Esto asegura que MongoDB inicie primero
+      - mongo
 
   frontend:
-    build: ./frontend-app
+    # USAR: ghcr.io/[usuario_minúsculas]/[repo_minúsculas]:latest-frontend
+    image: ghcr.io/adriantinal/practica-web:latest-frontend 
+    # AÑADIDO: Forzar la arquitectura a Linux/AMD64 para asegurar compatibilidad con el runner de GitHub
+    platform: linux/amd64
     ports:
-      # Corrección aquí:
-      - "3000:3000"
-    volumes:
-    - ./frontend-app:/app
-    - /app/node_modules
-    environment:
-    - CHOKIDAR_USEPOLLING=true
+      # Puerto del contenedor: Puerto local
+      - "3000:3000" 
+      
     depends_on:
-    - calculadora
+      - calculadora
     networks:
-    - mongo-network
+      - mongo-network
 
 networks:
   mongo-network:

@@ -107,3 +107,4 @@ def obtener_historial():
         })
     return {"historial": historial}
 
+# forzar el backend 
