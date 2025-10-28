@@ -4,3 +4,4 @@ pymongo
 pytest 
 mongomock
 httpx
+prometheus-fastapi-instrumentator==6.1.0
