@@ -24,3 +24,5 @@
 
 *.tar 
 **/_pycache_/
+**/monitoring/grafana-data
+**/monitoring/loki-data

@@ -5,3 +5,7 @@ pytest
 mongomock
 httpx
 prometheus-fastapi-instrumentator==6.1.0
+uvicorn==0.35.0
+loki-longger-handdler==1.1.2
+
+

@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 import main  # important: we need to patch main.collection_historial
 import datetime
 
+
 client = TestClient(main.app)
 
 # Create mock DB and collection

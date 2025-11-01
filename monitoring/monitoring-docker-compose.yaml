@@ -9,8 +9,31 @@ services:
     ports:
       - "9090:9090"
     networks:
-      - practicas_mongo-network
+      - desarrollowebii_mongo-network
     
+  loki:
+    image: mirror.gcr.io/grafana/loki:2.9.3
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - ./loki-data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - desarrollowebii_mongo-network
+
+  # promtail:
+  #   image: grafana/promtail:latest
+  #   container_name: promtail
+  #   depends_on:
+  #     - loki
+  #   volumes:
+  #     -var/lib/docker/containers:/var/lib/docker/containers:ro
+  #     -/var/run/docker.sock:/var/run/docker.sock:ro
+  #     -./promtail-config.yaml:/etc/promtail/config.yaml
+  #   networks:
+  #     - desarrollowebii_mongo-network\
 
   grafana:
     image: grafana/grafana:latest
@@ -18,7 +41,7 @@ services:
     ports:
       - "3001:3000"
     networks:
-      - practicas_mongo-network
+      - desarrollowebii_mongo-network
     depends_on:
       - prometheus
     environment:
@@ -28,5 +51,5 @@ services:
       - ./grafana-data:/var/lib/grafana
 
 networks:
-  practicas_mongo-network:
+  desarrollowebii_mongo-network:
     external: true  # importante: usar el mismo network que tus otros contenedores

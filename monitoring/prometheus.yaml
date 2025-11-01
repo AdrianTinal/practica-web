@@ -1,8 +1,9 @@
 global:
-  scrape_interval: 5s  # cada 5 segundos
+  scrape_interval: 5s
 
 scrape_configs:
   - job_name: "fastapi-backend"
+    metrics_path: /metrics
     static_configs:
-      - targets: ["practicas-calculadora-1:8000"]  # nombre del servicio y puerto dentro del network
+      - targets: ["calculadora:8000"]
 

@@ -1,8 +1,34 @@
 import datetime
+import logging
 from fastapi import FastAPI
 from pymongo import MongoClient
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
+from loki_logger_handler.loki_logger_handler import LokiLoggerHandler
+
+
+
+# Set up logging
+logger = logging.getLogger("custom_logger")
+logging_data = os.getenv("LOGGING_DATA", "info").upper() 
+if logging_data == "DEBUG":
+    log_level = logging.DEBUG
+elif logging_data == "INFO":
+    log_level = logging.INFO
+
+logger.setLevel(logging.DEBUG)
+
+# Create an instance of the custom handler
+custom_handler = LokiLoggerHandler(
+    url="http://loki:3100/loki/api/v1/push",
+    labels={"application": "FastApi"},
+    label_keys={},
+    timeout=10,
+)
+
+logger.addHandler(custom_handler)
+logger.info("Logger initialized and sending logs to Loki")
+
 
 app = FastAPI()
 app.add_middleware(
@@ -32,6 +58,9 @@ def sumar(a: float, b: float):
         "operacion": "suma",
         "date": datetime.datetime.now(tz=datetime.timezone.utc),
     }
+
+    logger.info(f"operacion exitosa")
+    logger.debug(f"Insertando documento en la base de datos: {document}")
     collection_historial.insert_one(document)
 
     return {"a": a, "b": b, "resultado": resultado}
