@@ -1,17 +1,12 @@
 import datetime
 import logging
 import os, sys
-# Agregamos HTTPException de FastAPI
-from fastapi import FastAPI, HTTPException 
-from pydantic import BaseModel # <-- ¡Necesitas esta importación para BaseModel!
+from fastapi import FastAPI
 from pymongo import MongoClient
 from fastapi.middleware.cors import CORSMiddleware
-# Agregamos Optional y List de typing
-from typing import Optional, List 
-# Agregamos timezone
-from datetime import datetime, timezone 
 from prometheus_fastapi_instrumentator import Instrumentator
 from loki_logger_handler.loki_logger_handler import LokiLoggerHandler
+
 # Set up logging
 logger = logging.getLogger("custom_logger")
 logging_data = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -52,7 +47,6 @@ class HistorialFilter(BaseModel):
     order_by: Optional[str] = "date"  
     order_direction: Optional[str] = "desc" 
 
-##
 class GrupoOperacion(BaseModel):
     operacion: str
     a: float
@@ -90,6 +84,10 @@ def sumar(numbers: Numbers):
         "operacion": "sum", 
         "date": datetime.now(tz=timezone.utc),
         }
+    collection_historial.insert_one(document)
+
+    logger.info(f"operacion suma exitosa")
+    logger.debug(f"Insertando documento en la base de datos: {document}")
     collection_historial.insert_one(document)
 
     return {"a": numbers.a, "b": numbers.b, "resultado": resultado}
@@ -221,7 +219,6 @@ def operaciones(request: GrupoOperacionesRequest):
         resultados.append(res_dict)
         
     return {"resultados": resultados}
-
 
 Instrumentator().instrument(app).expose(app)
 
