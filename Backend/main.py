@@ -52,6 +52,7 @@ class HistorialFilter(BaseModel):
     order_by: Optional[str] = "date"  
     order_direction: Optional[str] = "desc" 
 
+##
 class GrupoOperacion(BaseModel):
     operacion: str
     a: float
