@@ -1,11 +1,11 @@
 import datetime
 import logging
 import os, sys
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Counter # Importamos Counter para métricas custom
 from loki_logger_handler.loki_logger_handler import LokiLoggerHandler
 
 # =========================
@@ -28,9 +28,11 @@ formatter = logging.Formatter(
 console_handler.setFormatter(formatter)
 
 # Loki
+# NOTA: Asegúrate de que el contenedor de Loki esté accesible en 'http://loki:3100'
 loki_handler = LokiLoggerHandler(
     url="http://loki:3100/loki/api/v1/push",
-    labels={"application": "FastApi"},
+    # Añadimos etiquetas globales útiles para Grafana/Loki
+    labels={"application": "FastApi", "environment": "dev"}, 
     label_keys={},
     timeout=10,
 )
@@ -52,6 +54,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ======================
+# MÉTRICAS PROMETHEUS
+# ======================
+# Contador personalizado para errores de lógica de negocio (negativos, división por cero, fallos de DB)
+CALCULATOR_ERRORS = Counter(
+    "calculator_operation_errors_total",
+    "Total number of business logic errors in calculator operations",
+    ["operation", "error_type"] # Etiquetas para distinguir la operación y el tipo de error
+)
+
+# Inicializa y expone las métricas HTTP predeterminadas
+# Esto genera: http_request_duration_seconds (latencia) y http_requests_total (conteo por path y status)
+Instrumentator(
+    excluded_handlers=[".*/metrics"],
+).instrument(app).expose(app)
+
 # =====================
 # CONEXIÓN A MONGODB
 # =====================
@@ -66,17 +84,24 @@ collection_historial = database["historial"]
 
 def validar_entrada(a: float, b: float, operacion: str):
     """
-    Valida números de entrada. Aquí puedes forzar los errores
-    que el profe quiere que muestres (negativos, división entre 0, etc.)
+    Valida números de entrada y registra errores de negocio.
     """
     if a < 0 or b < 0:
+        error_type = "NegativeNumber"
         msg = f"Operación {operacion} inválida: no se permiten números negativos (a={a}, b={b})"
-        logger.error(msg)
+        # Loggear error de forma detallada para Loki
+        logger.error(msg, extra={"operation": operacion, "error_type": error_type, "a": a, "b": b})
+        # Incrementar contador custom para Prometheus
+        CALCULATOR_ERRORS.labels(operation=operacion, error_type=error_type).inc()
         raise HTTPException(status_code=400, detail=msg)
 
     if operacion == "division" and b == 0:
+        error_type = "DivisionByZero"
         msg = f"Operación division inválida: intento de dividir entre cero (a={a}, b={b})"
-        logger.error(msg)
+        # Loggear error de forma detallada para Loki
+        logger.error(msg, extra={"operation": operacion, "error_type": error_type, "a": a, "b": b})
+        # Incrementar contador custom para Prometheus
+        CALCULATOR_ERRORS.labels(operation=operacion, error_type=error_type).inc()
         raise HTTPException(status_code=400, detail=msg)
 
 
@@ -93,13 +118,18 @@ def guardar_operacion(a: float, b: float, resultado, operacion: str):
     try:
         logger.debug(f"Insertando documento en la base de datos: {document}")
         collection_historial.insert_one(document)
-        logger.info(f"Operación {operacion} almacenada correctamente en MongoDB")
+        # Requerimiento global: Loggear éxito
+        logger.info(f"Operación {operacion} almacenada correctamente en MongoDB", extra={"operation": operacion, "status": "db_success"})
     except Exception as e:
-        # ERROR por problemas con la base de datos (lo que pide el PDF)
-        logger.error(f"Error al guardar operación {operacion} en MongoDB: {e}")
+        error_type = "DatabaseConnection"
+        # Requerimiento global: Loggear error con la causa (ej. no conexión a mongo)
+        msg = f"Error al guardar operación {operacion} en MongoDB: No se pudo conectar/escribir. Causa: {e}"
+        logger.error(msg, extra={"operation": operacion, "error_type": error_type, "exception_detail": str(e)})
+        # Incrementar contador custom para Prometheus
+        CALCULATOR_ERRORS.labels(operation=operacion, error_type=error_type).inc()
         raise HTTPException(
             status_code=500,
-            detail=f"Error al guardar en historial: {str(e)}",
+            detail=f"Error al guardar en historial (Mongo): {str(e)}",
         )
 
 
@@ -109,83 +139,84 @@ def guardar_operacion(a: float, b: float, resultado, operacion: str):
 
 @app.get("/calculadora/sum")
 def sumar(a: float, b: float):
-    """
-    Suma dos números
-    Ejemplo: /calculadora/sum?a=5&b=10
-    """
     try:
         validar_entrada(a, b, "suma")
         resultado = a + b
         guardar_operacion(a, b, resultado, "suma")
 
-        logger.info(f"Operación suma exitosa: {a} + {b} = {resultado}")
+        # Requerimiento global: Loggear éxito de la operación
+        logger.info(f"Operación suma exitosa: {a} + {b} = {resultado}", extra={"operation": "suma", "status": "success", "a": a, "b": b, "resultado": resultado})
         return {"a": a, "b": b, "resultado": resultado}
     except HTTPException:
-        # Ya loggeamos dentro de validar_entrada/guardar_operacion
+        # Los errores 400 y 500 ya fueron loggeados e instrumentados
         raise
     except Exception as e:
-        logger.error(f"Error inesperado en suma: {e}")
-        raise HTTPException(status_code=500, detail="Error interno en suma")
+        # Manejo de cualquier error inesperado (ej. código)
+        error_type = "InternalServerError"
+        msg = f"Error inesperado en suma: {e}"
+        logger.error(msg, extra={"operation": "suma", "error_type": error_type, "exception_detail": str(e)})
+        CALCULATOR_ERRORS.labels(operation="suma", error_type=error_type).inc()
+        raise HTTPException(status_code=500, detail="Error interno inesperado en suma")
 
 
 @app.get("/calculadora/resta")
 def restar(a: float, b: float):
-    """
-    Resta dos números
-    Ejemplo: /calculadora/resta?a=5&b=10
-    """
     try:
         validar_entrada(a, b, "resta")
         resultado = a - b
         guardar_operacion(a, b, resultado, "resta")
 
-        logger.info(f"Operación resta exitosa: {a} - {b} = {resultado}")
+        # Requerimiento global: Loggear éxito de la operación
+        logger.info(f"Operación resta exitosa: {a} - {b} = {resultado}", extra={"operation": "resta", "status": "success", "a": a, "b": b, "resultado": resultado})
         return {"a": a, "b": b, "resultado": resultado}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error inesperado en resta: {e}")
-        raise HTTPException(status_code=500, detail="Error interno en resta")
+        error_type = "InternalServerError"
+        msg = f"Error inesperado en resta: {e}"
+        logger.error(msg, extra={"operation": "resta", "error_type": error_type, "exception_detail": str(e)})
+        CALCULATOR_ERRORS.labels(operation="resta", error_type=error_type).inc()
+        raise HTTPException(status_code=500, detail="Error interno inesperado en resta")
 
 
 @app.get("/calculadora/mult")
 def multiplicar(a: float, b: float):
-    """
-    Multiplica dos números
-    Ejemplo: /calculadora/mult?a=5&b=10
-    """
     try:
         validar_entrada(a, b, "multiplicacion")
         resultado = a * b
         guardar_operacion(a, b, resultado, "multiplicacion")
 
-        logger.info(f"Operación multiplicación exitosa: {a} * {b} = {resultado}")
+        # Requerimiento global: Loggear éxito de la operación
+        logger.info(f"Operación multiplicación exitosa: {a} * {b} = {resultado}", extra={"operation": "multiplicacion", "status": "success", "a": a, "b": b, "resultado": resultado})
         return {"a": a, "b": b, "resultado": resultado}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error inesperado en multiplicación: {e}")
-        raise HTTPException(status_code=500, detail="Error interno en multiplicación")
+        error_type = "InternalServerError"
+        msg = f"Error inesperado en multiplicación: {e}"
+        logger.error(msg, extra={"operation": "multiplicacion", "error_type": error_type, "exception_detail": str(e)})
+        CALCULATOR_ERRORS.labels(operation="multiplicacion", error_type=error_type).inc()
+        raise HTTPException(status_code=500, detail="Error interno inesperado en multiplicación")
 
 
 @app.get("/calculadora/div")
 def dividir(a: float, b: float):
-    """
-    Divide dos números
-    Ejemplo: /calculadora/div?a=5&b=10
-    """
     try:
         validar_entrada(a, b, "division")
-        resultado = a / b   # aquí ya sabemos que b != 0
+        resultado = a / b  # Ya se validó que b != 0
         guardar_operacion(a, b, resultado, "division")
 
-        logger.info(f"Operación división exitosa: {a} / {b} = {resultado}")
+        # Requerimiento global: Loggear éxito de la operación
+        logger.info(f"Operación división exitosa: {a} / {b} = {resultado}", extra={"operation": "division", "status": "success", "a": a, "b": b, "resultado": resultado})
         return {"a": a, "b": b, "resultado": resultado}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error inesperado en división: {e}")
-        raise HTTPException(status_code=500, detail="Error interno en división")
+        error_type = "InternalServerError"
+        msg = f"Error inesperado en división: {e}"
+        logger.error(msg, extra={"operation": "division", "error_type": error_type, "exception_detail": str(e)})
+        CALCULATOR_ERRORS.labels(operation="division", error_type=error_type).inc()
+        raise HTTPException(status_code=500, detail="Error interno inesperado en división")
 
 
 # ======================
@@ -198,22 +229,22 @@ def obtener_historial():
         operaciones = collection_historial.find({})
         historial = []
         for operacion in operaciones:
+            # Quitamos el ID de Mongo por seguridad/limpieza
+            operacion.pop('_id', None)
             historial.append({
                 "a": operacion["a"],
                 "b": operacion["b"],
                 "resultado": operacion["resultado"],
-                "date": operacion["date"].isoformat(),
+                # Se utiliza .isoformat() para serializar datetime correctamente
+                "date": operacion["date"].isoformat(), 
                 "operacion": operacion["operacion"],
             })
 
-        logger.info("Consulta de historial exitosa")
+        logger.info("Consulta de historial exitosa", extra={"operation": "historial", "status": "success", "count": len(historial)})
         return {"historial": historial}
     except Exception as e:
-        logger.error(f"Error al obtener historial de MongoDB: {e}")
-        raise HTTPException(status_code=500, detail="Error al obtener historial")
-
-
-# ======================
-# MÉTRICAS PROMETHEUS
-# ======================
-Instrumentator().instrument(app).expose(app)
+        # Requerimiento global: Loggear error con la causa
+        error_type = "DatabaseConnection"
+        msg = f"Error al obtener historial de MongoDB: {e}"
+        logger.error(msg, extra={"operation": "historial", "error_type": error_type, "exception_detail": str(e)})
+        raise HTTPException(status_code=500, detail=f"Error al obtener historial de Mongo: {str(e)}")
