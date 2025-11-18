@@ -53,30 +53,33 @@ function App() {
             })
         });
 
-        if (res.status !== 200) {
-            const data = await res.json();
-            console.error(`Error de API: ${data.detail}`);
-            // En caso de error, siempre inicializamos con array vacío
+        // 1. Manejo de errores HTTP (400, 500, etc.)
+        if (!res.ok) {
+            console.error(`Error de API: ${res.status} ${res.statusText}`);
+            // Si hay un error, el estado debe ser un array vacío para evitar el crash.
             setHistorial([]); 
             return;
         }
 
         const data = await res.json();
         
-        // 🚀 VERIFICACIÓN CLAVE: Asegurarse de que data.historial exista.
+        // 2. Manejo de formato de respuesta inválido o incompleto
+        // Si 'data' existe Y 'data.historial' es un array...
         if (data && Array.isArray(data.historial)) {
             setHistorial(data.historial);
         } else {
-            console.warn("La API no devolvió la propiedad 'historial' o el formato es incorrecto.");
-            setHistorial([]); // Protegemos el estado si la respuesta no es la esperada
+            console.warn("Respuesta de API inválida: 'historial' no encontrado o no es un array.");
+            // Si el formato es incorrecto, protegemos el estado con []
+            setHistorial([]); 
         }
 
     } catch (error) {
-        // Esto captura errores de red (fetch fallido) o fallos en res.json()
-        console.error("Error al obtener el historial:", error);
-        setHistorial([]); // Si hay un error, el estado debe ser []
+        // 3. Manejo de fallos de red o fallos en res.json() (ej. respuesta no JSON)
+        console.error("Fallo grave al obtener historial (Red o JSON.parse):", error);
+        // En cualquier caso de excepción, establecemos historial a []
+        setHistorial([]); 
     }
-  };
+};
 
   useEffect(() => {
     obtenerHistorial();
