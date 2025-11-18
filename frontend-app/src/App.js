@@ -43,7 +43,7 @@ function App() {
 
   const obtenerHistorial = async () => {
     try {
-        const res = await fetch("/calculadora/historial", {
+        const res = await fetch("http://calculadora:8000/calculadora/historial", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
