@@ -86,10 +86,6 @@ def sumar(numbers: Numbers):
         }
     collection_historial.insert_one(document)
 
-    logger.info(f"operacion suma exitosa")
-    logger.debug(f"Insertando documento en la base de datos: {document}")
-    collection_historial.insert_one(document)
-
     return {"a": numbers.a, "b": numbers.b, "resultado": resultado}
 
 @app.post("/calculadora/resta")
@@ -219,6 +215,7 @@ def operaciones(request: GrupoOperacionesRequest):
         resultados.append(res_dict)
         
     return {"resultados": resultados}
+
 
 Instrumentator().instrument(app).expose(app)
 
