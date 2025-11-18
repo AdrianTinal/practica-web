@@ -43,27 +43,38 @@ function App() {
 
   const obtenerHistorial = async () => {
     try {
+        const res = await fetch("/calculadora/historial", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                operacion: filterType || null,
+                order_by: orderBy,
+                order_direction: orderDirection
+            })
+        });
 
-      const res = await fetch("/calculadora/historial", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          operacion: filterType || null,
-          order_by: orderBy,
-          order_direction: orderDirection
-        })
-      });
-      
-      if (res.status !== 200) {
+        if (res.status !== 200) {
+            const data = await res.json();
+            console.error(`Error de API: ${data.detail}`);
+            // En caso de error, siempre inicializamos con array vacío
+            setHistorial([]); 
+            return;
+        }
+
         const data = await res.json();
-        alert(`Error: ${data.detail}`);
-        return;
-      }
+        
+        // 🚀 VERIFICACIÓN CLAVE: Asegurarse de que data.historial exista.
+        if (data && Array.isArray(data.historial)) {
+            setHistorial(data.historial);
+        } else {
+            console.warn("La API no devolvió la propiedad 'historial' o el formato es incorrecto.");
+            setHistorial([]); // Protegemos el estado si la respuesta no es la esperada
+        }
 
-      const data = await res.json();
-      setHistorial(data.historial);
     } catch (error) {
-      console.error("Error al obtener el historial:", error);
+        // Esto captura errores de red (fetch fallido) o fallos en res.json()
+        console.error("Error al obtener el historial:", error);
+        setHistorial([]); // Si hay un error, el estado debe ser []
     }
   };
 
