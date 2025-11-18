@@ -1,12 +1,17 @@
 import datetime
 import logging
 import os, sys
-from fastapi import FastAPI
+# Agregamos HTTPException de FastAPI
+from fastapi import FastAPI, HTTPException 
+from pydantic import BaseModel # <-- ¡Necesitas esta importación para BaseModel!
 from pymongo import MongoClient
 from fastapi.middleware.cors import CORSMiddleware
+# Agregamos Optional y List de typing
+from typing import Optional, List 
+# Agregamos timezone
+from datetime import datetime, timezone 
 from prometheus_fastapi_instrumentator import Instrumentator
 from loki_logger_handler.loki_logger_handler import LokiLoggerHandler
-
 # Set up logging
 logger = logging.getLogger("custom_logger")
 logging_data = os.getenv("LOG_LEVEL", "INFO").upper()
