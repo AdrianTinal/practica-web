@@ -34,6 +34,12 @@ services:
     ports:
       # Puerto del contenedor: Puerto local
       - "3000:3000" 
+    
+    environment:
+      # 🚀 INDICA al servidor de desarrollo de React que use el proxy.
+      # El nombre 'calculadora' es el nombre del servicio Docker.
+      # Si usas Create React App (CRA), esta variable debe ser 'PROXY=http://calculadora:8000'
+      PROXY: http://calculadora:8000
       
     depends_on:
       - calculadora
