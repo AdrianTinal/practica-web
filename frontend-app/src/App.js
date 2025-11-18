@@ -133,7 +133,7 @@ function App() {
           </select>
         </div>
         <ul>
-          {historial.map((op, i) => (
+          {historial?.map((op, i) => ( 
             <li key={i}>
               {op.a} {op.operacion === "sum" ? "+" : ""}
               {op.operacion === "resta" ? "-" : ""}
