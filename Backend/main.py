@@ -8,9 +8,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_client import Counter # Importamos Counter para métricas custom
 from loki_logger_handler.loki_logger_handler import LokiLoggerHandler
 
-# =========================
 # CONFIGURACIÓN DE LOGGING
-# =========================
 logger = logging.getLogger("custom_logger")
 
 logging_data = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -28,7 +26,6 @@ formatter = logging.Formatter(
 console_handler.setFormatter(formatter)
 
 # Loki
-# NOTA: Asegúrate de que el contenedor de Loki esté accesible en 'http://loki:3100'
 loki_handler = LokiLoggerHandler(
     url="http://loki:3100/loki/api/v1/push",
     # Añadimos etiquetas globales útiles para Grafana/Loki
@@ -41,9 +38,7 @@ logger.addHandler(console_handler)
 logger.addHandler(loki_handler)
 logger.info("Logger initialized")
 
-# ===============
 # CONFIG FASTAPI
-# ===============
 app = FastAPI()
 
 app.add_middleware(
@@ -54,33 +49,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ======================
 # MÉTRICAS PROMETHEUS
-# ======================
-# Contador personalizado para errores de lógica de negocio (negativos, división por cero, fallos de DB)
 CALCULATOR_ERRORS = Counter(
     "calculator_operation_errors_total",
     "Total number of business logic errors in calculator operations",
     ["operation", "error_type"] # Etiquetas para distinguir la operación y el tipo de error
 )
 
-# Inicializa y expone las métricas HTTP predeterminadas
-# Esto genera: http_request_duration_seconds (latencia) y http_requests_total (conteo por path y status)
+
 Instrumentator(
     excluded_handlers=[".*/metrics"],
 ).instrument(app).expose(app)
 
-# =====================
 # CONEXIÓN A MONGODB
-# =====================
 mongo_client = MongoClient("mongodb://admin_user:web3@mongo:27017/")
 database = mongo_client["practica1"]
 collection_historial = database["historial"]
 
 
-# ============
 # HELPERS
-# ============
 
 def validar_entrada(a: float, b: float, operacion: str):
     """
@@ -133,11 +120,9 @@ def guardar_operacion(a: float, b: float, resultado, operacion: str):
         )
 
 
-# =========================
 # ENDPOINTS DE OPERACIONES
-# =========================
 
-@app.get("/calculadora/sum")
+@app.post("/calculadora/sum")
 def sumar(a: float, b: float):
     try:
         validar_entrada(a, b, "suma")
@@ -219,9 +204,7 @@ def dividir(a: float, b: float):
         raise HTTPException(status_code=500, detail="Error interno inesperado en división")
 
 
-# ======================
 # ENDPOINT HISTORIAL
-# ======================
 
 @app.get("/calculadora/historial")
 def obtener_historial():
